@@ -37,7 +37,7 @@ let img;
         maxNumHands: 1,
         minDetectionConfidence: 0.5,
         minTrackingConfidence: 0.5,
-        useCpuInference: true,
+        useCpuInference: false, //if m1 mac: true, else: false
         selfieMode:true
       });
       hands.onResults(onResults);
