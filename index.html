@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.js"></script>
+  <script src="https://docs.opencv.org/3.4.1/opencv.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  
+  <script type="text/javascript">
+    
+    
+    var videoElement ;
+    var canvasElement;
+    var canvasCtx;
+let img;
+    var initialized=false;
+    var prevRatio=0;
+    function setup() {
+      
+    }
+ /*   function draw() {
+      
+    }*/
+    
+    window.onload = function() {
+      videoElement = document.getElementsByClassName('input_video')[0];
+      canvasElement = document.getElementsByClassName('output_canvas')[0];
+      canvasCtx = canvasElement.getContext('2d');
+      const hands = new Hands({locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+      }});
+      
+      hands.setOptions({
+        maxNumHands: 1,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+        useCpuInference: true,
+        selfieMode:true
+      });
+      hands.onResults(onResults);
+      const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await hands.send({image: videoElement});
+      },
+      width: 1280,
+      height: 720
+    });
+    camera.start();
+    };
+    
+    
+    function onResults(results) {      
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+      
+      let rotatedRect;
+      let rotatedFullRect;
+      let rotatedFistRect;
+      let angle;
+        
+      if (results.multiHandLandmarks) {
+        let count=0;
+        for (const landmarks of results.multiHandLandmarks) {
+         
+          let points1 = [];
+          let points2 = [];
+          for(var i=2;i<21;i++){
+            points1.push(landmarks[i].x*results.image.width);
+            points1.push(landmarks[i].y*results.image.height);
+            //親指意外を格納
+            if(i>4){
+              points2.push(landmarks[i].x*results.image.width);
+              points2.push(landmarks[i].y*results.image.height);            
+            }
+          }
+       
+          let mat = cv.matFromArray(points1.length/2, 1, cv.CV_32SC2, points1);
+          let mat2 = cv.matFromArray(points2.length/2, 1, cv.CV_32SC2, points2);
+          
+          rotatedRect = cv.fitEllipse(mat);
+          rotatedFullRect=cv.minAreaRect(mat);
+          rotatedFistRect=cv.minAreaRect(mat2);
+          
+          //角度の計算は要改良
+          angle = rotatedRect.angle;
+          if(angle>90){
+            angle=angle-180;
+          }
+          angle=-(180-angle);
+          
+          mat.delete();
+          mat2.delete();
+          
+          drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS,{color: '#00FF00', lineWidth: 2});
+          drawLandmarks(canvasCtx, landmarks, {color: '#FF0000', lineWidth: 1,radius:2});         
+          count++;
+        }
+      }
+      canvasCtx.restore();
+      
+      if(!initialized){
+        initialized=true;
+        var w=max(results.image.width, results.image.height);
+        var h=min(results.image.width, results.image.height);
+        createCanvas(w, h);
+        img = loadImage('./saber.png');
+ 
+      }else{
+        clear();
+        background(255,255,255,0);
+        if(rotatedRect){    
+          var fullL=max(rotatedFullRect.size.width,rotatedFullRect.size.height);
+          var fistL=max(rotatedFistRect.size.width,rotatedFistRect.size.height);
+          var ratio=fistL/fullL;
+       
+          //0.45:sumb up 0.65:close
+          ratio=(ratio-0.45)/(0.65-0.45);
+          if(ratio>1)ratio=1;
+          else if(ratio<0)ratio=0;
+          ratio=1-ratio;
+          ratio*=2;
+          
+          ratio =ratio*rotatedRect.size.width*1.6/76.0;
+          ratio=0.2*ratio+0.8*prevRatio;
+          prevRatio=ratio;
+          push();
+          translate(rotatedRect.center.x, rotatedRect.center.y);
+          rotate(angle*PI /180.0);
+          scale(ratio, ratio);
+          //console.log(img.width);
+          translate(-img.width/2.0,-10);
+          image(img,0,0);
+          pop();
+        }
+      }
+    }
+</script>
+  
+  </head>
+
+<body>
+  
+  <div class="container">
+    <video class="input_video" style="position:absolute; display:none;"></video>
+    <canvas class="output_canvas" width="1280px" height="720px" style="position:absolute;"></canvas>
+    <main style="position:absolute;">
+    </main>
+  </div>
+</body>
+</html>
