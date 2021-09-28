@@ -1,4 +1,4 @@
 # AR-LightSaber-with-MediaPipe
 
-Only work on non m1 mac.<br>
+This works on win/mac (except for m1 chip).<br>
 https://takashiyoshinaga.github.io/AR-LightSaber-with-MediaPipe/
