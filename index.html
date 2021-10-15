@@ -39,7 +39,7 @@
       var videoElement = document.getElementById('input_video');
       canvasElement = document.getElementById('output_canvas');
       canvasCtx = canvasElement.getContext('2d');
-      beam = loadImage('https://cdn.glitch.me/63001bf4-e2da-4448-94d2-18ba372607cd%2F31d85c8b-ed5b-4b5e-b5d7-f1f9f41eb935-saber.png?v=1634332683872');
+      beam = loadImage('./saber.png');
       const hands = new Hands({locateFile: (file) => {
         return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
       }});
