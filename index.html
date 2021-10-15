@@ -14,7 +14,7 @@
     let beam;
     var detected=false;
     var prevRatio=0;
-    let rotatedRect;
+    let rotatedEllipse;
     var ratio;
     var angle;
     function setup() {}
@@ -22,11 +22,11 @@
       clear();
       background(255,255,255,0);
       if(detected){   
-        ratio =ratio*(rotatedRect.size.width*2.0/76.0);
+        ratio =ratio*(rotatedEllipse.size.width*2.0/76.0);
         ratio=0.3*ratio+0.7*prevRatio;
         prevRatio=ratio;
         push();
-        translate(rotatedRect.center.x, rotatedRect.center.y);
+        translate(rotatedEllipse.center.x, rotatedEllipse.center.y);
         rotate(angle*PI /180.0);
         scale(ratio, ratio);
         translate(-beam.width/2.0,0);
@@ -69,7 +69,7 @@
         points1.push(landmarks[i].y*height);
       }         
       let mat = cv.matFromArray(points1.length/2, 1, cv.CV_32SC2, points1);      
-      rotatedRect = cv.fitEllipse(mat);
+      rotatedEllipse = cv.fitEllipse(mat);
       mat.delete();
     }
    
@@ -84,7 +84,7 @@
       //1.3:sumb up 0.6:close
       ratio=map(ratio,0.95,1.3,0,1,true);
            
-      angle = rotatedRect.angle;
+      angle = rotatedEllipse.angle;
       if(angle<90){
         angle=angle-180;
       }
