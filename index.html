@@ -18,7 +18,7 @@
     var ratio;
     var angle;
     function setup() {}
-    function draw() {
+    function drawLightSaber(){
       clear();
       background(255,255,255,0);
       if(detected){   
@@ -114,6 +114,7 @@
         }
       }
       canvasCtx.restore();  
+      drawLightSaber();
     }
   </script>
 </head>
