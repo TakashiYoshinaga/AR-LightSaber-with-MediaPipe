@@ -18,6 +18,7 @@
     let detected; //手が認識されたか否かを保持
     let ell; //手の位置や傾きを表す楕円
     let ratio; //親指の立ち具合を保持
+    var prevRatio=0; //前フレームのratio
 
     //初期化
     function setup() {/*p5.jsの初期化(今回は不使用だが要記述)*/}
@@ -100,7 +101,9 @@
       ratio=distance1/distance2;
       //0.6:close, 1.3:sumb up 閉じる条件は少し甘めに0.9にする
       //0.9~1.3を0~1に正規化
-      ratio=map(ratio,0.9,1.3,0,1,true);      
+      ratio=map(ratio,0.9,1.3,0,1,true);  
+      ratio=0.3*ratio+0.7*prevRatio;
+      prevRatio=ratio;    
     }
     //手の中心や傾きを計算
     function cvFunction(landmarks,width,height){                
