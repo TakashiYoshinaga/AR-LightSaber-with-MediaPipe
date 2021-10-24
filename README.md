@@ -7,4 +7,4 @@
 This works on win/mac (except for m1 chip).<br>
 https://takashiyoshinaga.github.io/AR-LightSaber-with-MediaPipe/
 
-<b>If you're m1 mac user, please turn true useCpuInference in source code.</b>
+<b>If you're m1 mac user, please use Firefox or Chrome instead of Safari.</b>
