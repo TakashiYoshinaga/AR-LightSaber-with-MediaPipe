@@ -2,119 +2,150 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.js"></script>
-  <script src="https://docs.opencv.org/3.4.1/opencv.js"></script>
+  <!--media pipe: 手の骨格取得や認識結果の描画に使用-->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-  
+  <!--opencv.js: 手の傾きや中心位置を計算するために使用-->
+  <script src="https://docs.opencv.org/3.4.1/opencv.js"></script>
+  <!--p5.js: ライトセイバーを手軽に描くために使用-->
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.js"></script>
+  <!--今回のハンズオンで行う処理を記述-->
   <script type="text/javascript">
-    var canvasElement;
-    var canvasCtx;
-    let beam;
-    var detected=false;
-    var prevRatio=0;
-    let rotatedEllipse;
-    var ratio;
-    var angle;
-    function setup() {}
-    function drawLightSaber(){
-      clear();
-      background(255,255,255,0);
-      if(detected){   
-        ratio =ratio*(rotatedEllipse.size.width*2.0/76.0);
-        ratio=0.3*ratio+0.7*prevRatio;
-        prevRatio=ratio;
-        push();
-        translate(rotatedEllipse.center.x, rotatedEllipse.center.y);
-        rotate(angle*PI /180.0);
-        scale(ratio, ratio);
-        translate(-beam.width/2.0,0);
-        image(beam,0,0);
-        pop();
-      }
-    }
-    
+    let canvasElement;
+    let canvasCtx;
+    let beam;//ライトセイバー的な画像
+    let detected; //手が認識されたか否かを保持
+    let ell; //手の位置や傾きを表す楕円
+    let ratio; //親指の立ち具合を保持
+
+    //初期化
+    function setup() {/*p5.jsの初期化(今回は不使用だが要記述)*/}
     window.onload = function() {
-      var videoElement = document.getElementById('input_video');
+      //画像の読み込み
+      beam = loadImage('https://cdn.glitch.me/4fccf3e4-d0b4-4661-a74b-9e894218f74a%2Fbeam.png?v=1635037710714');      
+      let videoElement = document.getElementById('input_video');
       canvasElement = document.getElementById('output_canvas');
       canvasCtx = canvasElement.getContext('2d');
-      beam = loadImage('./saber.png');
+      //HandTrackingを使用するための関連ファイルの取得と初期化
       const hands = new Hands({locateFile: (file) => {
         return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
       }});
-      
+      //手の認識に関するオプション
       hands.setOptions({
-        maxNumHands: 1,
-        modelComplexity: 1,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-        useCpuInference: false, //if m1 mac: true, else: false
-        selfieMode:true
+        selfieMode:true, //画像を左右反転
+        maxNumHands: 1, //認識可能な手の最大数
+        modelComplexity: 1,//精度に関する設定(0~1)
+        minDetectionConfidence: 0.5,//手検出の信頼度
+        minTrackingConfidence: 0.5,//手追跡の信頼度
+        useCpuInference: false, //M1 MacのSafariの場合は1
       });
-      hands.onResults(onResults);
+       //結果を処理する関数を登録
+      hands.onResults(recvResults);
+      //カメラの初期化
       const camera = new Camera(videoElement, {
         onFrame: async () => {
+          //カメラの画像を用いて手の検出を実行
           await hands.send({image: videoElement});
         },
-        width: 1280,
-        height: 720
+        width: 1280, height: 720
       });
+      //カメラの動作開始
       camera.start();
     };
-    
-    function cvFunction(landmarks,width,height){      
-      let points1 = [];
-      for(var i=2;i<21;i++){
-        points1.push(landmarks[i].x*width);
-        points1.push(landmarks[i].y*height);
-      }         
-      let mat = cv.matFromArray(points1.length/2, 1, cv.CV_32SC2, points1);      
-      rotatedEllipse = cv.fitEllipse(mat);
-      mat.delete();
+    //手の検出結果を利用する
+    function recvResults(results) {     
+      var width=results.image.width;
+      var height=results.image.height;
+      //画像のサイズとcanvasのサイズが異なる場合はサイズを調整
+      if(width!=canvasElement.width){
+        //入力画像と同じサイズのcanvas(描画領域)を用意
+        canvasElement.width=width;
+        canvasElement.height=height;
+        //p5.jsの描画領域を初期化
+        createCanvas(width, height);
+      }
+      //以下、canvasへの描画に関する記述
+      canvasCtx.save();
+      //画像を表示
+      canvasCtx.drawImage(results.image, 0, 0, width, height);  
+      detected = false;
+      //手を検出したならばtrue
+      if (results.multiHandLandmarks) {        
+        //見つけた手の数だけ処理を繰り返す
+        for (const landmarks of results.multiHandLandmarks) { 
+          detected = true;
+          //骨格を描画
+          drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS,{color: '#00FF00', lineWidth: 2});
+          //関節を描画
+          drawLandmarks(canvasCtx, landmarks, {color: '#FF0000', lineWidth: 1,radius:2});  
+          cvFunction(landmarks,width,height);   
+          calcHandState(landmarks,width,height); 
+        }
+      }      
+      canvasCtx.restore();   
+      drawLightSaber();
     }
-   
+    //親指の状態を監視
     function calcHandState(landmarks,width,height){
+      //親指と人差し指までの距離
       var dx=(landmarks[7].x-landmarks[4].x)*width;
       var dy=(landmarks[7].y-landmarks[4].y)*height;
       var distance1 = Math.sqrt(dx*dx + dy*dy);
+      //人差し指から小指までの距離
       dx=(landmarks[7].x-landmarks[19].x)*width;
       dy=(landmarks[7].y-landmarks[19].y)*height;
       var distance2 = Math.sqrt(dx*dx + dy*dy);
+      //
       ratio=distance1/distance2;
-      //1.3:sumb up 0.6:close
-      ratio=map(ratio,0.95,1.3,0,1,true);
-           
-      angle = rotatedEllipse.angle;
-      if(angle<90){
-        angle=angle-180;
-      }
+      //0.6:close, 1.3:sumb up 閉じる条件は少し甘めに0.9にする
+      //0.9~1.3を0~1に正規化
+      ratio=map(ratio,0.9,1.3,0,1,true);      
     }
-    
-    function onResults(results) {     
-      var width=results.image.width;
-      var height=results.image.height;
-      if(width!=canvasElement.width){
-        //入力画像と同じサイズのcanvasを用意
-        canvasElement.width=width;
-        canvasElement.height=height;
-        createCanvas(width, height);
+    //手の中心や傾きを計算
+    function cvFunction(landmarks,width,height){                
+      let points = [];
+      //手のひらや親指の付け根付近以外の関節を取得
+      for(var i=2;i<21;i++){
+        //0~1で表現されたx,yを画像のサイズに変換
+        points.push(landmarks[i].x*width);
+        points.push(landmarks[i].y*height);
       }
-      detected=false;
-      canvasCtx.save();
-      //canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-      canvasCtx.drawImage(results.image, 0, 0, width, height);      
-      if (results.multiHandLandmarks) {        
-        for (const landmarks of results.multiHandLandmarks) {   
-          drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS,{color: '#00FF00', lineWidth: 2});
-          drawLandmarks(canvasCtx, landmarks, {color: '#FF0000', lineWidth: 1,radius:2});  
-          cvFunction(landmarks,width,height);  
-          calcHandState(landmarks,width,height);
-          detected=true;
-        }
+      //点の集まりをOpenCVで扱えるデータフォーマットに変換         
+      let mat = cv.matFromArray(points.length/2, 1, cv.CV_32SC2, points);
+      //点の集まりにフィットする楕円を計算 
+      ell = cv.fitEllipse(mat);
+      //メモリの解放
+      mat.delete();
+    }    
+    //ライトセイバーを表示
+    function drawLightSaber(){
+      clear();
+      //p5.js用の描画領域を透明色でクリア
+      background(255,255,255,0);
+      //もし手が検出されていたら描画
+      if(detected){
+        push();
+        //楕円の角度
+        let angle = ell.angle;
+        //ライトセイバーの向きを反転
+        if(angle<90){ angle=angle-180; }
+        //デフォルトサイズを元画像の2倍くらいにしたい。
+        let mul = ratio* (ell.size.width*2.0)/beam.width;
+        //塗りつぶしなしの図形
+        noFill();
+        //位置指定
+        translate(ell.center.x, ell.center.y);
+        //角度指定
+        rotate(angle * PI /180.0);
+        //楕円を描画
+        ellipse(0,0,ell.size.width, ell.size.height);   
+        //デフォルトサイズに倍数をかける
+        scale(mul, mul);
+        //画像の位置を横幅の半分だけずらして表示
+        image(beam,-beam.width/2.0,0);
+        pop();   
       }
-      canvasCtx.restore();  
-      drawLightSaber();
     }
   </script>
 </head>
@@ -125,3 +156,4 @@
     <main style="position:absolute;"></main>
 </body>
 </html>
+
