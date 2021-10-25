@@ -8,8 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
   <!--opencv.js: 手の傾きや中心位置を計算するために使用-->
   <script src="https://docs.opencv.org/3.4.1/opencv.js"></script>
-  <!--p5.js: ライトセイバーを手軽に描くために使用-->
-  <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.js"></script>
+
   <!--今回のハンズオンで行う処理を記述-->
   <script type="text/javascript">
     let canvasElement;
@@ -18,15 +17,16 @@
     let detected; //手が認識されたか否かを保持
     let ell; //手の位置や傾きを表す楕円
     let ratio; //親指の立ち具合を保持
-    var prevRatio=0; //前フレームのratio
-
+    let prevRatio=0; //前フレームのratio
     //初期化
-    function setup() {/*p5.jsの初期化(今回は不使用だが要記述)*/}
     window.onload = function() {
       //画像の読み込み
-      beam = loadImage('https://cdn.glitch.me/4fccf3e4-d0b4-4661-a74b-9e894218f74a%2Fbeam.png?v=1635037710714');      
+      beam = document.getElementById("beam");           
+      //ビデオ要素の取得
       let videoElement = document.getElementById('input_video');
+      //表示用のCanvasを取得
       canvasElement = document.getElementById('output_canvas');
+      //Canvas描画に関する情報にアクセス
       canvasCtx = canvasElement.getContext('2d');
       //HandTrackingを使用するための関連ファイルの取得と初期化
       const hands = new Hands({locateFile: (file) => {
@@ -34,7 +34,7 @@
       }});
       //手の認識に関するオプション
       hands.setOptions({
-        selfieMode:true, //画像を左右反転
+        selfieMode:true,　 //画像を左右反
         maxNumHands: 1, //認識可能な手の最大数
         modelComplexity: 1,//精度に関する設定(0~1)
         minDetectionConfidence: 0.5,//手検出の信頼度
@@ -63,50 +63,48 @@
         //入力画像と同じサイズのcanvas(描画領域)を用意
         canvasElement.width=width;
         canvasElement.height=height;
-        //p5.jsの描画領域を初期化
-        createCanvas(width, height);
       }
       //以下、canvasへの描画に関する記述
       canvasCtx.save();
       //画像を表示
       canvasCtx.drawImage(results.image, 0, 0, width, height);  
-      detected = false;
       //手を検出したならばtrue
       if (results.multiHandLandmarks) {        
         //見つけた手の数だけ処理を繰り返す
-        for (const landmarks of results.multiHandLandmarks) { 
-          detected = true;
+        for (const landmarks of results.multiHandLandmarks) {   
           //骨格を描画
           drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS,{color: '#00FF00', lineWidth: 2});
           //関節を描画
           drawLandmarks(canvasCtx, landmarks, {color: '#FF0000', lineWidth: 1,radius:2});  
-          cvFunction(landmarks,width,height);   
+          cvFunction(landmarks,width,height); 
           calcHandState(landmarks,width,height); 
+          drawLightSaber();
         }
-      }      
-      canvasCtx.restore();   
-      drawLightSaber();
+      }
+      canvasCtx.restore();         
     }
     //親指の状態を監視
     function calcHandState(landmarks,width,height){
       //親指と人差し指までの距離
-      var dx=(landmarks[7].x-landmarks[4].x)*width;
-      var dy=(landmarks[7].y-landmarks[4].y)*height;
-      var distance1 = Math.sqrt(dx*dx + dy*dy);
+      let dx=(landmarks[7].x-landmarks[4].x)*width;
+      let dy=(landmarks[7].y-landmarks[4].y)*height;
+      let distance1 = Math.sqrt(dx*dx + dy*dy);
       //人差し指から小指までの距離
       dx=(landmarks[7].x-landmarks[19].x)*width;
       dy=(landmarks[7].y-landmarks[19].y)*height;
-      var distance2 = Math.sqrt(dx*dx + dy*dy);
+      let distance2 = Math.sqrt(dx*dx + dy*dy);
       //
       ratio=distance1/distance2;
       //0.6:close, 1.3:sumb up 閉じる条件は少し甘めに0.9にする
       //0.9~1.3を0~1に正規化
-      ratio=map(ratio,0.9,1.3,0,1,true);  
+      let close=0.9;
+      let up=1.3;
+      ratio=(Math.max(close,Math.min(up,ratio))-close)/(up-close);//map(ratio,0.9,1.3,0,1,true);
       ratio=0.3*ratio+0.7*prevRatio;
-      prevRatio=ratio;    
+      prevRatio=ratio;
     }
     //手の中心や傾きを計算
-    function cvFunction(landmarks,width,height){                
+    function cvFunction(landmarks,width,height){      
       let points = [];
       //手のひらや親指の付け根付近以外の関節を取得
       for(var i=2;i<21;i++){
@@ -120,43 +118,35 @@
       ell = cv.fitEllipse(mat);
       //メモリの解放
       mat.delete();
-    }    
+    }
     //ライトセイバーを表示
     function drawLightSaber(){
-      clear();
-      //p5.js用の描画領域を透明色でクリア
-      background(255,255,255,0);
-      //もし手が検出されていたら描画
-      if(detected){
-        push();
-        //楕円の角度
-        let angle = ell.angle;
-        //ライトセイバーの向きを反転
-        if(angle<90){ angle=angle-180; }
-        //デフォルトサイズを元画像の2倍くらいにしたい。
-        let mul = ratio* (ell.size.width*2.0)/beam.width;
-        //塗りつぶしなしの図形
-        noFill();
-        //位置指定
-        translate(ell.center.x, ell.center.y);
-        //角度指定
-        rotate(angle * PI /180.0);
-        //楕円を描画
-        ellipse(0,0,ell.size.width, ell.size.height);   
-        //デフォルトサイズに倍数をかける
-        scale(mul, mul);
-        //画像の位置を横幅の半分だけずらして表示
-        image(beam,-beam.width/2.0,0);
-        pop();   
-      }
+      //楕円の角度
+      let angle = ell.angle;
+      //ライトセイバーの向きを反転
+      if(angle<90){ angle=angle-180; }   
+      //デフォルトサイズを元画像の2倍くらいにしたい。
+      let mul = ratio* (ell.size.width*2.0)/beam.width;
+      //位置指定
+      canvasCtx.translate(ell.center.x, ell.center.y);
+      //角度指定
+      canvasCtx.rotate(angle * Math.PI /180.0);
+      //楕円を描画
+      canvasCtx.beginPath();
+      canvasCtx.ellipse(0, 0, ell.size.width/2.0, ell.size.height/2.0, 0, 0, 2 * Math.PI);
+      canvasCtx.stroke();
+      //デフォルトサイズに倍数をかける
+      canvasCtx.scale(mul, mul);
+      //画像の位置を横幅の半分だけずらして描画
+      canvasCtx.drawImage(beam, -beam.width/2.0, 0, beam.width, beam.height);      
     }
   </script>
 </head>
 
 <body>
     <video id="input_video" style="position:absolute; display:none;"></video>
+    <img id="beam" src="https://cdn.glitch.me/ad9fef5c-efc6-4637-81e8-6db3270ffc22%2Fbeam.png?v=1635160767213" style="position:absolute; display:none;">
     <canvas id="output_canvas" style="position:absolute;"></canvas>
-    <main style="position:absolute;"></main>
 </body>
 </html>
 
