@@ -39,7 +39,7 @@
         modelComplexity: 1,//精度に関する設定(0~1)
         minDetectionConfidence: 0.5,//手検出の信頼度
         minTrackingConfidence: 0.5,//手追跡の信頼度
-        useCpuInference: false, //M1 MacのSafariの場合は1
+        useCpuInference: false, //M1 MacのSafariの場合はtrue
       });
        //結果を処理する関数を登録
       hands.onResults(recvResults);
