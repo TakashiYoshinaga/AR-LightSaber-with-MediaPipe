@@ -5,7 +5,7 @@
   <!--media pipe: 手の骨格取得や認識結果の描画に使用-->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
   <!--opencv.js: 手の傾きや中心位置を計算するために使用-->
   <script src="https://docs.opencv.org/3.4.1/opencv.js"></script>
 
@@ -30,7 +30,7 @@
       canvasCtx = canvasElement.getContext('2d');
       //HandTrackingを使用するための関連ファイルの取得と初期化
       const hands = new Hands({locateFile: (file) => {
-        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${file}`;
       }});
       //手の認識に関するオプション
       hands.setOptions({
