@@ -55,15 +55,17 @@
       camera.start();
     };
     //手の検出結果を利用する
-    function recvResults(results) {     
-      var width=results.image.width;
-      var height=results.image.height;
+    function recvResults(results) {    
+      let width=results.image.width;
+      let height=results.image.height;
       //画像のサイズとcanvasのサイズが異なる場合はサイズを調整
-      if(width!=canvasElement.width){
-        //入力画像と同じサイズのcanvas(描画領域)を用意
-        canvasElement.width=width;
-        canvasElement.height=height;
+       if(window.innerWidth!=canvasElement.width){
+          //画面と同じ横幅のcanvas(描画領域)を用意
+          canvasElement.width=window.innerWidth;
+          canvasElement.height=height*window.innerWidth/width;
       }
+      width=canvasElement.width;
+      height=canvasElement.height;
       //以下、canvasへの描画に関する記述
       canvasCtx.save();
       //画像を表示
@@ -149,4 +151,3 @@
     <canvas id="output_canvas" style="position:absolute;"></canvas>
 </body>
 </html>
-
