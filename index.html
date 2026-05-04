@@ -6,8 +6,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
-  <!--opencv.js: 手の傾きや中心位置を計算するために使用-->
-  <script src="https://docs.opencv.org/3.4.1/opencv.js"></script>
 
   <!--今回のハンズオンで行う処理を記述-->
   <script type="text/javascript">
@@ -111,36 +109,74 @@
       //手のひらや親指の付け根付近以外の関節を取得
       for(var i=2;i<21;i++){
         //0~1で表現されたx,yを画像のサイズに変換
-        points.push(landmarks[i].x*width);
-        points.push(landmarks[i].y*height);
+        points.push({
+          x: landmarks[i].x*width,
+          y: landmarks[i].y*height
+        });
       }
-      //点の集まりをOpenCVで扱えるデータフォーマットに変換         
-      let mat = cv.matFromArray(points.length/2, 1, cv.CV_32SC2, points);
-      //点の集まりにフィットする楕円を計算 
-      ell = cv.fitEllipse(mat);
-      //メモリの解放
-      mat.delete();
+
+      // OpenCVのfitEllipseの代わりに、手の関節点の分布から楕円を近似する。
+      // 点群の平均を楕円の中心、分散・共分散から求めた主成分方向を楕円の傾きとして使う。
+      let centerX = 0;
+      let centerY = 0;
+      for (const point of points) {
+        centerX += point.x;
+        centerY += point.y;
+      }
+      centerX /= points.length;
+      centerY /= points.length;
+
+      let xx = 0;
+      let yy = 0;
+      let xy = 0;
+      for (const point of points) {
+        const dx = point.x - centerX;
+        const dy = point.y - centerY;
+        xx += dx * dx;
+        yy += dy * dy;
+        xy += dx * dy;
+      }
+      xx /= points.length;
+      yy /= points.length;
+      xy /= points.length;
+
+      // 分散共分散行列の固有ベクトルが長軸方向、固有値が各方向の広がりになる。
+      const angle = 0.5 * Math.atan2(2 * xy, xx - yy);
+      const trace = xx + yy;
+      const diff = xx - yy;
+      const root = Math.sqrt(diff * diff + 4 * xy * xy);
+      const major = Math.sqrt(Math.max((trace + root) / 2, 1));
+      const minor = Math.sqrt(Math.max((trace - root) / 2, 1));
+
+      ell = {
+        center: {x: centerX, y: centerY},
+        size: {width: major * 4, height: minor * 4},
+        angle: angle * 180.0 / Math.PI + 90
+      };
     }
     //ライトセイバーを表示
     function drawLightSaber(){
+      if (!beam.complete || beam.naturalWidth === 0 || beam.naturalHeight === 0) {
+        return;
+      }
       //楕円の角度
       let angle = ell.angle;
       //ライトセイバーの向きを反転
       if(angle<90){ angle=angle-180; }   
       //デフォルトサイズを元画像の2倍くらいにしたい。
-      let mul = ratio* (ell.size.width*2.0)/beam.width;
+      let mul = ratio* (ell.size.width*2.0)/beam.naturalWidth;
       //位置指定
       canvasCtx.translate(ell.center.x, ell.center.y);
       //角度指定
       canvasCtx.rotate(angle * Math.PI /180.0);
       //楕円を描画
       canvasCtx.beginPath();
-      canvasCtx.ellipse(0, 0, ell.size.width/2.0, ell.size.height/2.0, 0, 0, 2 * Math.PI);
+      canvasCtx.ellipse(0, 0, ell.size.height/2.0, ell.size.width/2.0, 0, 0, 2 * Math.PI);
       canvasCtx.stroke();
       //デフォルトサイズに倍数をかける
       canvasCtx.scale(mul, mul);
       //画像の位置を横幅の半分だけずらして描画
-      canvasCtx.drawImage(beam, -beam.width/2.0, 0, beam.width, beam.height);      
+      canvasCtx.drawImage(beam, -beam.naturalWidth/2.0, 0, beam.naturalWidth, beam.naturalHeight);      
     }
   </script>
 </head>
